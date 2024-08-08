@@ -1,0 +1,14 @@
+langchain==0.2.12
+langchain-community==0.2.11
+langchain-openai==0.1.20
+openai==1.32.0
+tiktoken==0.7.0
+PyPDF2==3.0.1
+python-dotenv==1.0.0
+streamlit==1.18.1
+faiss-cpu==1.7.4
+altair==4
+# Uncomment if needed
+# huggingface-hub==0.14.1
+# InstructorEmbedding==1.0.1
+# sentence-transformers==2.2.2
