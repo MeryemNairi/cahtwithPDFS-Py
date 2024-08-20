@@ -10,6 +10,7 @@ from htmlTemplates import css, bot_template, user_template
 import os
 import psycopg2
 import traceback
+from collections import Counter
 
 # Charger les variables d'environnement
 load_dotenv()
@@ -18,6 +19,12 @@ SUPABASE_DB = os.getenv("SUPABASE_DB")
 SUPABASE_PORT = os.getenv("SUPABASE_PORT")
 SUPABASE_USER = os.getenv("SUPABASE_USER")
 SUPABASE_PASSWORD = os.getenv("SUPABASE_PASSWORD")
+
+# Sentiment analysis (simple placeholder function)
+def analyze_sentiment(text):
+    # Placeholder function for sentiment analysis.
+    # Implement a real sentiment analysis function using a library like TextBlob or VADER.
+    return "positive" if "good" in text.lower() else "negative"
 
 def get_pdf_text(pdf_docs):
     text = ""
@@ -52,6 +59,31 @@ def get_conversation_chain(vectorstore):
     )
     return conversation_chain
 
+def analyze_conversation(text):
+    lines = text.split('\n')
+    participants = Counter()
+    topics = Counter()
+    sentiments = Counter()
+
+    for line in lines:
+        if ':' in line:
+            person, message = line.split(':', 1)
+            person = person.strip()
+            message = message.strip()
+            participants[person] += 1
+            # Simple topic extraction (could be improved)
+            if "topic" in message.lower():
+                topics[message] += 1
+            # Sentiment analysis
+            sentiment = analyze_sentiment(message)
+            sentiments[(person, sentiment)] += 1
+
+    most_active = participants.most_common(1)[0] if participants else None
+    most_positive = [p for p, s in sentiments if s == 'positive']
+    most_negative = [p for p, s in sentiments if s == 'negative']
+
+    return participants, topics, most_active, most_positive, most_negative
+
 def handle_userinput(user_question):
     response = st.session_state.conversation.invoke({'question': user_question})
     st.session_state.chat_history = response['chat_history']
@@ -59,11 +91,9 @@ def handle_userinput(user_question):
     for i, message in enumerate(st.session_state.chat_history):
         if i % 2 == 0:
             st.write(user_template.replace("{{MSG}}", message.content), unsafe_allow_html=True)
-            # Save user message to the database
             save_message_to_db(user_message=message.content, bot_response="")
         else:
             st.write(bot_template.replace("{{MSG}}", message.content), unsafe_allow_html=True)
-            # Update database with bot response
             update_message_in_db(bot_response=message.content)
 
 def get_db_connection():
@@ -93,8 +123,7 @@ def save_message_to_db(user_message, bot_response):
         traceback.print_exc()
 
 def update_message_in_db(bot_response):
-    # Implement this if needed
-    pass
+    pass  # Implement this if needed
 
 def test_db_connection():
     try:
@@ -117,7 +146,7 @@ def test_db_connection():
         traceback.print_exc()
 
 def main():
-    st.set_page_config(page_title="Chat with multiple PDFs", page_icon=":books:")
+    st.set_page_config(page_title="Chat avec notre conversation WhatsApp", page_icon=":speech_balloon:")
     st.write(css, unsafe_allow_html=True)
 
     if "conversation" not in st.session_state:
@@ -125,14 +154,11 @@ def main():
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = None
 
-    st.header("Chat with multiple PDFs :books:")
-    user_question = st.text_input("Ask a question about your documents:")
-    if user_question:
-        handle_userinput(user_question)
+    st.header("Chat avec notre conversation WhatsApp :speech_balloon:")
 
     with st.sidebar:
-        st.subheader("Your documents")
-        pdf_docs = st.file_uploader("Upload your PDFs here and click on 'Process'", accept_multiple_files=True)
+        st.subheader("Vos documents")
+        pdf_docs = st.file_uploader("Téléchargez vos fichiers PDF ici et cliquez sur 'Process'", accept_multiple_files=True)
         if pdf_docs:
             st.write("Fichiers téléchargés :")
             for pdf in pdf_docs:
@@ -140,7 +166,7 @@ def main():
 
         if st.button("Process"):
             if pdf_docs:
-                with st.spinner("Processing"):
+                with st.spinner("Traitement en cours"):
                     try:
                         raw_text = get_pdf_text(pdf_docs)
                         st.write("Texte extrait des PDFs :")
@@ -150,10 +176,27 @@ def main():
                         vectorstore = get_vectorstore(text_chunks)
                         st.session_state.conversation = get_conversation_chain(vectorstore)
                         st.write("Vectorstore créé et conversation chain initialisée.")
+
+                        # Analyze conversation
+                        participants, topics, most_active, most_positive, most_negative = analyze_conversation(raw_text)
+                        
+                        # Display summary
+                        st.subheader("Résumé de la Conversation")
+                        st.write(f"**Contexte de la conversation :** Le texte extrait des fichiers PDF.")
+                        st.write(f"**Participants :** {', '.join(participants.keys())}")
+                        st.write(f"**Sujets abordés :** {', '.join(topics.keys())}")
+                        st.write(f"**Personne la plus active :** {most_active[0] if most_active else 'Aucun participant'}")
+                        st.write(f"**Personnes les plus positives :** {', '.join(most_positive) if most_positive else 'Aucune'}")
+                        st.write(f"**Personnes les plus négatives :** {', '.join(most_negative) if most_negative else 'Aucune'}")
+
                     except Exception as e:
                         st.error(f"Une erreur est survenue : {e}")
             else:
                 st.warning("Veuillez télécharger des fichiers PDF avant de cliquer sur 'Process'")
+
+    user_question = st.text_input("Posez une question sur votre conversation WhatsApp:")
+    if user_question:
+        handle_userinput(user_question)
 
 if __name__ == '__main__':
     main()
