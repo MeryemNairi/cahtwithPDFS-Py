@@ -13,17 +13,20 @@ import traceback
 from collections import Counter
 
 # Charger les variables d'environnement
-load_dotenv()
+load_dotenv()  # Assure que les variables d'environnement sont chargées depuis le fichier .env
+
+# Accéder aux variables d'environnement
 SUPABASE_HOST = os.getenv("SUPABASE_HOST")
 SUPABASE_DB = os.getenv("SUPABASE_DB")
 SUPABASE_PORT = os.getenv("SUPABASE_PORT")
 SUPABASE_USER = os.getenv("SUPABASE_USER")
 SUPABASE_PASSWORD = os.getenv("SUPABASE_PASSWORD")
 
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 # Sentiment analysis (simple placeholder function)
 def analyze_sentiment(text):
     # Placeholder function for sentiment analysis.
-    # Implement a real sentiment analysis function using a library like TextBlob or VADER.
     return "positive" if "good" in text.lower() else "negative"
 
 def get_pdf_text(pdf_docs):
@@ -45,12 +48,12 @@ def get_text_chunks(text):
     return chunks
 
 def get_vectorstore(text_chunks):
-    embeddings = OpenAIEmbeddings()
+    embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)  # Pass the API key to OpenAIEmbeddings
     vectorstore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
     return vectorstore
 
 def get_conversation_chain(vectorstore):
-    llm = ChatOpenAI()
+    llm = ChatOpenAI(api_key=OPENAI_API_KEY)  # Pass the API key to ChatOpenAI
     memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
     conversation_chain = ConversationalRetrievalChain.from_llm(
         llm=llm,
@@ -71,10 +74,8 @@ def analyze_conversation(text):
             person = person.strip()
             message = message.strip()
             participants[person] += 1
-            # Simple topic extraction (could be improved)
             if "topic" in message.lower():
                 topics[message] += 1
-            # Sentiment analysis
             sentiment = analyze_sentiment(message)
             sentiments[(person, sentiment)] += 1
 
